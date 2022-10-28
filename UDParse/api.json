@@ -1,0 +1,529 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "UDParse API",
+    "description": "Orange Dependancy Analysis solution, the famous UDPipe, tuned by Orange",
+    "termsOfService": "",
+    "contact": {},
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "1.0.0"
+  },
+  "components": {
+    "schemas": {
+      "StatusModel": {
+        "type": "object",
+        "description": "the status data",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "the name of the service"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ko",
+              "loading"
+            ],
+            "description": "status of the API"
+          },
+          "version": {
+            "type": "string",
+            "description": "version of the API"
+          },
+          "components": {
+            "description": "API sub components, if any",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusComponentModel"
+            }
+          },
+          "data": {
+            "type": "object",
+            "description": "data sources of UDParse"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "version"
+        ]
+      },
+      "StatusComponentModel": {
+        "type": "object",
+        "description": "the status component data",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "name of the sub component"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ko"
+            ],
+            "description": "status of the sub component"
+          },
+          "version": {
+            "type": "string",
+            "description": "version of the sub component"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "version"
+        ]
+      },
+      "TokenizationResultModel": {
+        "type": "object",
+        "description": "the status component data",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "name of the sub component"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ko"
+            ],
+            "description": "status of the sub component"
+          },
+          "version": {
+            "type": "string",
+            "description": "version of the sub component"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "version"
+        ]
+      },
+      "ErrorModel": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "the error type"
+          },
+          "message": {
+            "type": "string",
+            "description": "a short description of the error"
+          },
+          "description": {
+            "type": "string",
+            "description": "a longer description of the error"
+          }
+        },
+        "description": "model for errors returned by the API"
+      },
+      "TokenizationInputModel": {
+        "type": "object",
+        "description": "the process inputs: data and parameters",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "the data to analyse"
+          },
+          "presegmented": {
+            "type": "boolean",
+            "description": "whether the input is already segmented according to sentences",
+            "default": false
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "ParsingResultModel": {
+        "type": "object",
+        "description": "the status component data",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "name of the sub component"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ko"
+            ],
+            "description": "status of the sub component"
+          },
+          "version": {
+            "type": "string",
+            "description": "version of the sub component"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "version"
+        ]
+      },
+      "ParsingInputModel": {
+        "type": "object",
+        "description": "the process inputs: data and parameters",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "the data to analyse"
+          },
+          "conllu": {
+            "type": "string",
+            "description": "the data to analyse, already tokenized, in conllu format"
+          },
+          "presegmented": {
+            "type": "boolean",
+            "description": "whether the input is already segmented according to sentences",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/doc": {
+      "get": {
+        "tags": [
+          "commons"
+        ],
+        "description": "Returns the json description",
+        "responses": {
+          "200": {
+            "description": "specification",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "tags": [
+          "commons"
+        ],
+        "description": "Returns the status of the API",
+        "responses": {
+          "200": {
+            "description": "status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "tags": [
+          "commons"
+        ],
+        "description": "Returns the status of the API",
+        "responses": {
+          "200": {
+            "description": "status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tokenize": {
+      "get": {
+        "tags": [
+          "process"
+        ],
+        "summary": "tokenization process",
+        "description": "Returns the tokenized version of the input",
+        "parameters": [
+          {
+            "name": "text",
+            "description": "the text to analysis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "presegmented",
+            "description": "is the input pre segmented (in sentences)",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenizationResultModel"
+                }
+              },
+              "text/tab-separated-values": {}
+            }
+          },
+          "400": {
+            "description": "Request raises a problem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      },
+      "post": {
+        "tags": [
+          "process"
+        ],
+        "summary": "tokenization process",
+        "description": "Returns the tokenized version of the input",
+        "requestBody": {
+          "description": "the data for the extraction request",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenizationInputModel"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenizationInputModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenizationResultModel"
+                }
+              },
+              "text/tab-separated-values": {}
+            }
+          },
+          "400": {
+            "description": "Request raises a problem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/parse": {
+      "get": {
+        "tags": [
+          "process"
+        ],
+        "summary": "parsing process",
+        "description": "Returns the parsed version of the input",
+        "parameters": [
+          {
+            "name": "text",
+            "description": "the text to analysis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "conllu",
+            "description": "the text to analysis, already tokenized in conllu format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "parse",
+            "description": "if false, only lemmatize and assign POS tags, if true add dependency syntax analysis",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
+          },
+          {
+            "name": "presegmented",
+            "description": "is the input pre segmented (in sentences)",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParsingResultModel"
+                }
+              },
+              "text/tab-separated-values": {}
+            }
+          },
+          "400": {
+            "description": "Request raises a problem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      },
+      "post": {
+        "tags": [
+          "process"
+        ],
+        "summary": "parsing process",
+        "description": "Returns the parsed version of the input",
+        "requestBody": {
+          "description": "the data for the extraction request",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ParsingInputModel"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParsingInputModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParsingResultModel"
+                }
+              },
+              "text/tab-separated-values": {}
+            }
+          },
+          "400": {
+            "description": "Request raises a problem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "security": [],
+  "tags": [
+    {
+      "name": "commons",
+      "description": "usual functions"
+    },
+    {
+      "name": "settings",
+      "description": "get information about api settings (ie: models, quotas)"
+    },
+    {
+      "name": "process",
+      "description": "input analysis"
+    }
+  ],
+  "externalDocs": {
+    "description": "Find more info here",
+    "url": "to_be_completed"
+  }
+}

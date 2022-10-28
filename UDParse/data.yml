@@ -1,0 +1,13 @@
+
+configs:
+  fr-xlmr:
+    calculate_embeddings: xlmr
+    dev: /universal-dependencies/ud-treebanks-v2.8/UD_French-GSD/fr_gsd-ud-dev.conllu
+    embeddings: /universal-dependencies/models/2.8/udpf/tmp/data/fr-bert
+    gpu: 0
+    out: /universal-dependencies/models/2.8/udpf/fr-bert
+    test: /universal-dependencies/ud-treebanks-v2.8/UD_French-GSD/fr_gsd-ud-test.conllu
+    tokmodel: /universal-dependencies/models/2.8/tok/fr_gsd.tok.model
+    train:
+    - /universal-dependencies/ud-treebanks-v2.8/UD_French-GSD/fr_gsd-ud-train.conllu
+
