@@ -15,7 +15,7 @@
 import sys
 import collections
 import requests
-
+import json
 
 class PS_Client:
     def __init__(self, serie, url):
@@ -26,7 +26,7 @@ class PS_Client:
 
     def update(self, index, **kwargs):
         try:
-            params = collections.OrderedDict([("serie", self.serie), ("index", index)])
+            params = collections.OrderedDict([("serie", self.serie), ("index", str(index))])
             self.index = index
             for k, v in kwargs.items():
                 if k == "listtype":
@@ -37,7 +37,7 @@ class PS_Client:
             # params["logdir"] = '%s:%s' % (socket.gethostname(), args.logdir)
 
             # print("pppp", params)
-            r = requests.get(url="%s/setlog" % (self.url), params=params)
+            r = requests.get(url="%s/setlog" % (self.url), params = {"data":json.dumps(params)})
             # print("progressserver %s" % (self.url), file=sys.stderr)
             self.I_know_serverDown = False
         except:  # Exception as e:
@@ -53,7 +53,7 @@ class PS_Client:
             params = {
                 "serie": self.serie,
                 "valuename": value,
-                # "inverse": inverse,
+                "inverse": inverse,
                 "minval": minv,
                 "maxval": maxv,
             }
@@ -72,7 +72,7 @@ class PS_Client:
     def __del__(self):
         try:
             # log to progressserver, if it is running
-            params = {"serie": self.serie, "index": self.index}
+            params = {"serie": self.serie, "index": str(self.index)}
             r = requests.get(url="%s/cleanlog" % (self.url), params=params)
             print("progressserver clean %s" % (self.url), file=sys.stderr)
         except:
@@ -81,4 +81,22 @@ class PS_Client:
 
 
 if __name__ == "__main__":
-    psc = PS_Client("a", "b")
+    pserver = sys.argv[1]
+    psc = PS_Client("test", pserver)
+    psc.setlimits("LAS", 0, 100, inverse=True)
+
+    psc.update(
+        index="%s:%s" % ("t1", "t2"),
+        LAS="60"
+        )
+    psc.update(
+        index="%s:%s" % ("t1", "t2"),
+        LAS="65"
+        )
+    psc.update(
+        index="%s:%s" % ("t1", "t2"),
+        LAS="71"
+        )
+
+    input("enter any key")
+    

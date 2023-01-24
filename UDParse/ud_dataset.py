@@ -20,6 +20,7 @@
 import io
 import logging
 import re
+import sys
 
 import numpy as np
 import psutil
@@ -159,7 +160,6 @@ class UDDataset:
         "DEPS": DEPS,
         "MISC": MISC,
     }
-
     re_extras = re.compile(r"^#|^\d+-|^\d+\.")
 
     class _Factor:
@@ -186,8 +186,7 @@ class UDDataset:
             res.append("word_ids: %s" % self.word_ids)
             return "\n".join(res)
 
-    def __init__(
-        self,
+    def __init__(self,
         filenames,
         root_factors=[],
         embeddings_data=None,
@@ -197,7 +196,9 @@ class UDDataset:
         max_sentences=None,
         progserver=None,
         emb_calculator=None,
+                 verbose=True
     ):
+
         # Create factors
         self._factors = []
         for f in range(self.FACTORS):
@@ -258,8 +259,8 @@ class UDDataset:
             sct = 0
             for line in infile:
                 lct += 1
-                if lct % 700 == 0:
-                    print("%d CoNLL-U lines read..." % (lct), end="\r")
+                if verbose and lct % 700 == 0:
+                    print("%d CoNLL-U lines read..." % (lct), end="\r", file=sys.stderr)
                 line = line.rstrip("\r\n")
                 # print("LINE:", line)
                 if line:
@@ -345,7 +346,7 @@ class UDDataset:
                     sct += 1
                     if max_sentences is not None and len(self._factors[self.FORMS].word_ids) >= max_sentences:
                         break
-            print("%d CoNLL-U lines read..." % (lct))
+            if verbose: print("%d CoNLL-U lines read..." % (lct), file=sys.stderr)
             logger.info("all %d CoNLL-U lines read. %d sentences" % (lct, sct))
 
         # Finalize lemmas if needed
@@ -390,7 +391,7 @@ class UDDataset:
             for conlluline in text:
                 ct += 1
                 if ct % 7 == 0:
-                    print("%3d sentences vectorised" % ct, end="\r")
+                    if verbose: print("%3d sentences vectorised" % ct, end="\r", file=sys.stderr)
                     if psc and ct % 28 == 0:
                         psc.update(
                             index=psutil.Process().pid,
@@ -407,7 +408,7 @@ class UDDataset:
                 # print("=========================")
                 #self._embeddings_data.append(np.array(emb)) # expensive !!!!!!
                 self._embeddings_data.append(emb) # keep original tf.Tensor
-            print("all %d sentences vectorised" % ct)
+            if verbose: print("all %d sentences vectorised" % ct, file=sys.stderr)
             #self._embeddings_data_size = self._embeddings_data[0].shape[1] if self._embeddings_data else 0 # if numpy
             self._embeddings_data_size = len(self._embeddings_data[0][0]) if self._embeddings_data else 0 # Tensor from prepareEmbeddings
             if isinstance(filename, io.StringIO):
@@ -556,11 +557,10 @@ class UDDataset:
                             # print("RULE", fields, field)
                             #orig = field
                             field = _apply_lemma_rule(fields[-1], field)
-                            #print("correct rule:", fields, orig, field, offset, overrides[f])
+                            #print("correct rule:", fields, field, offset, overrides[f])
                         else:
                             print("missing ; in rule:", fields, field, offset, overrides[f])
 
                 fields.append(field)
-
             print("\t".join(fields), file=output)
         print(file=output)

@@ -26,6 +26,9 @@ from flask_cors import CORS #, cross_origin
 import UDParse.conllu2svg as conllu2svg
 import UDParse.version as version
 
+import UDParse.exceptions as udpexceptions
+
+
 ID = 0
 FORM = 1
 LEMMA = 2
@@ -38,7 +41,7 @@ API_VERSION = "1.0.0"
 API_PATH = "/api/v1"
 mydir = os.path.dirname(__file__)
 
-class UDarseServer:
+class UDParseServer:
     def __init__(self,
                  udparseinstance,
                  port,
@@ -161,6 +164,7 @@ class UDarseServer:
             presegmented = self.checkParameter(request, 'presegmented' , 'boolean', isOptional=True, defaultValue=False)
             parse = self.checkParameter(request, 'parse' , 'boolean', isOptional=True, defaultValue=True)
             do_format = self.checkParameter(request, 'format' , 'boolean', isOptional=True, defaultValue=False)
+            correctlg = self.checkParameter(request, 'correct' , 'string', isOptional=True, defaultValue=None)
             print("txt: <%s>" % text_input, file=sys.stderr)
             if not text_input:
                 conllu_input = self.checkParameter(request, 'conllu' , 'string', isOptional=False, defaultValue=None)
@@ -177,14 +181,17 @@ class UDarseServer:
                                                   is_text = False,
                                                   is_pre_segmented = presegmented,
                                                   tok_only = False,
-                                                  do_parse = parse)
+                                                  do_parse = parse,
+                                                  correct_lg = correctlg)
             else:
                 result = self.udparse.api_process(in_text = text_input,
                                                   is_text = True,
                                                   is_pre_segmented = presegmented,
                                                   tok_only = False,
-                                                  do_parse = parse)
+                                                  do_parse = parse,
+                                                  correct_lg = correctlg)
 
+            #print("eeee", result)
             if do_format:
                 # format for UI display
                 allsentences = []
@@ -192,9 +199,14 @@ class UDarseServer:
                 dico = []
                 for sentence in result.strip().split("\n\n"):                        
                     newsent = []
+                    corrections = []
                     for line in sentence.split("\n"):
                         line = line.strip()
-                        if not line or line[0] == "#":
+                        if not line:
+                            continue
+                        if line[0] == "#":
+                            if line.startswith("# corrected"):
+                                corrections = [int(x) for x in line.split("\t")[1:]]
                             continue
                         newsent.append(line.split("\t"))
                     allsentences.append(newsent)
@@ -202,8 +214,10 @@ class UDarseServer:
                     trees.append(cs.svg(sentence))
                     dico.append({
                         "conllu": allsentences[-1],
-                        "tree": trees[-1]
+                        "tree": trees[-1],
+                        "corrections": corrections
                         })
+                #print(json.dumps(dico, indent=2))
                 return Response(json.dumps(dico), 200 , mimetype="application/json")
             else:
                 requestMimeTypes = [request.headers["Accept"].split(";")[0].split(",")[0]]
@@ -214,9 +228,9 @@ class UDarseServer:
 
 
 
-        @app.errorhandler(ServerException)
+        @app.errorhandler(udpexceptions.UDParseError)
         def handle_invalid_usage(error):
-            response = jsonify({"message": error.value}) #jsonify(error.to_dict())
+            response = jsonify({"message": error.message}) #jsonify(error.to_dict())
             response.status_code = 400 #error.status_code
             return response
 
@@ -226,10 +240,17 @@ class UDarseServer:
 
 
     def hasloaded(self):
+        #print("zzzzzzzzzzzz", self.udparse.status, self.udparse.submitresult.done())
         if not self.udparse.submitresult.done():
             err = {"code":3,
                    "description":"The service is not yet available.",
                    "message": "still loading"}
+
+            return Response(json.dumps(err), 503 , mimetype="application/json")
+        elif self.udparse.status != "ok":
+            err = {"code": 4,
+                   "description": "The service is not available.",
+                   "message": str(self.udparse.status) }
 
             return Response(json.dumps(err), 503 , mimetype="application/json")
         else:
@@ -378,12 +399,11 @@ class UDarseServer:
         raise ServerException("Another stupid error occurred. Invalid paramtype? %s %s" % (paramName, paramType))
 
 
-class ServerException(Exception):
+class ServerException(udpexceptions.UDParseError):
     def __init__(self, value):
-        self.value = value
+        self.message = value
 
-    def __str__(self):
-        return repr(self.value)
+        super().__init__(self.message)
 
 
 

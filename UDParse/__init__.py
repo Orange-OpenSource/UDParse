@@ -32,19 +32,8 @@ import time
 import concurrent.futures
 
 # configuration or logger (used in all files)
-logging.config.dictConfig(
-            {
-                "version": 1,
-                "disable_existing_loggers": False,
-                "formatters": {
-                    "default": {
-                        "format": "%(levelname)s %(name)s %(asctime)s %(message)s",
-                    }
-                },
-                "handlers": {"default": {"class": "logging.StreamHandler", "formatter": "default", }},
-                "loggers": {"udparse": {"handlers": ["default"], "level": "WARN", "propagate": False}},
-            }
-        )
+import UDParse.logging_config_dict
+logging.config.dictConfig(UDParse.logging_config_dict.cfg)
 logger = logging.getLogger("udparse")
 
 
@@ -63,7 +52,10 @@ try:
     import UDParse.udpipe as udpipe
 except:
     print("UDParse.udpipe not found, cannot predict text")
+
 import UDParse.version as version
+import UDParse.lexicons as lexicons
+import UDParse.exceptions as udpexceptions
 
 
 class DefaultArgs:
@@ -127,9 +119,9 @@ class Action(Enum):
     PREDICT = 2
     TRAIN = 4
     TRAIN_TEST = 8
-    EMB = 0x10
-    SHOW = 0x100
-    LIST = 0x1000
+    EMB = 0x100
+    SHOW = 0x1000
+    LIST = 0x10000
 
 
 loglevels = {
@@ -154,7 +146,13 @@ class UDParse:
         usepytorch: bool = False,
         ps=None,  # TODO add comment
         forceoutdir=False,
+        fullformscfg=None
     ):
+
+        self.fullforms = None
+        if fullformscfg:
+            self.fullforms = lexicons.Lexicons(fullformscfg)
+        
         if not yml:
             self.alldata = yaml.safe_load(open(os.path.dirname(__file__) + "/data.yml"))
             self.ymlbasedir = os.path.abspath(os.path.dirname(__file__) + "/..")
@@ -298,13 +296,19 @@ class UDParse:
                     args.calculate_embeddings = self.data["calculate_embeddings"]
                 print("configuration:")
                 print(args)
-                #self.root_factors, self.trainobj, self.network, self.calc = ud_parser.predict(args)
+                #self.root_factors, self.trainobj, self.network, self.calc = ud_parser.mainpredict(args)
                 def loadudparse(args, ud_parser):
-                    self.root_factors, self.trainobj, self.network, self.calc = ud_parser.predict(args)
+                    try:
+                        self.status = "loading..."
+                        self.root_factors, self.trainobj, self.network, self.calc = ud_parser.mainpredict(args)
+                        self.status = "ok"
+                    except Exception as e:
+                        logger.error("*** Data loading error %s" % e)
+                        self.status = "Error while loading parsing model"
 
                 pool = concurrent.futures.ThreadPoolExecutor()
                 self.submitresult = pool.submit(loadudparse, args, ud_parser)
-    
+                print("LOAD", self.status)
 
 
 
@@ -316,7 +320,7 @@ class UDParse:
         if self.action == Action.TEST:
             self.test(self.args, outfile, evalfile)
         elif self.action == Action.PREDICT:
-            self.predict(infile, outfile, istext=istext, presegmented=presegmented)
+            self.predict(infile, outfile, istext=istext, presegmented=presegmented, evalfile=evalfile)
         elif self.action == Action.TRAIN:
             self.train(self.args, gpu=self.args.gpu)
         elif self.action == Action.TRAIN_TEST:
@@ -595,7 +599,8 @@ class UDParse:
 
     #   datatypye: pure text or tokenized conllu
     #   presegmented
-    def predict(self, infile, outfile, istext=False, presegmented=False):
+    def predict(self, infile, outfile, istext=False, presegmented=False, evalfile=None):
+        # if input is conllu and if evalfile != None, we run evaluation as well
         # process a tokenized CoNLL-U file
         if not infile:
             self.errmsg("option --infile needed")
@@ -614,7 +619,7 @@ class UDParse:
                 if not outfile:
                     self.errmsg("option --outfile needed")
 
-            tok = self.udpipe.process_line(text_input, presegmented=presegmented)
+            tok = self.udpipe.process_line(text_input.replace(" ", " "), presegmented=presegmented)
             self.args.predict_input = [io.StringIO(tok)]
         else:
             self.args.predict_input = [infile]
@@ -645,11 +650,15 @@ class UDParse:
         # load only here to respect CUDA_VISIBLE_DEVICE
         import UDParse.ud_parser_tf2 as ud_parser
 
-        ud_parser.predict(self.args)
+        ud_parser.mainpredict(self.args)
+        if evalfile:
+            if not istext:
+                self.evaluate(self.args, evalfile)
 
     def api_process(self, in_text: str, is_text: bool = False, is_pre_segmented: bool = False,
                     tok_only: bool = False,
-                    do_parse: bool = True):
+                    do_parse: bool = True,
+                    correct_lg: str = None):
         """ process content submitted through the web API
 
         Args:
@@ -662,10 +671,13 @@ class UDParse:
             [type]: [description]
         """
 
-        # only called by server
+        # only called by server (or if used as library)
+        if correct_lg and self.fullforms and correct_lg != "?":
+            if correct_lg not in self.fullforms.lgs:
+                raise udpexceptions.UDParseLanguageError("'%s' not in valid languages '%s'" % (correct_lg, "', '".join(self.fullforms.lgs.keys())))
 
         if is_text:
-            tok = self.udpipe.process_line(in_text, presegmented=is_pre_segmented)
+            tok = self.udpipe.process_line(in_text.replace(" ", " "), presegmented=is_pre_segmented)
             # replace QQQQ again by spaces (produced for French in process.py:process_inputs()
             tok = tok.replace("QQQQ", " ")
             fp = io.StringIO(tok)
@@ -676,13 +688,15 @@ class UDParse:
         if tok_only:
             return tok
 
+        try:
         # start time of vectorisation
         aa = time.time()
         text = ud_dataset.UDDataset([fp],
                                     self.root_factors,
                                     train=self.trainobj,
                                     shuffle_batches=False,
-                                    emb_calculator=self.calc
+                                        emb_calculator=self.calc,
+                                        verbose=False,
                                     )
         # end time of vectorisation, start time of tagging/parsing
         bb = time.time()
@@ -691,6 +705,13 @@ class UDParse:
             self.args.parse = False
 
         result = self.network.predict(text, False, self.args, self.trainobj)
+            # add postcorrection (only available in server and lib mode)
+            if self.fullforms and correct_lg:
+                lg = correct_lg
+                if lg == "?":
+                    lg = None
+                result = self.fullforms.correctlemmas(lg, result)
+
         # end time of sentence processing
         cc = time.time()
 
@@ -698,6 +719,9 @@ class UDParse:
         #print("VECTORISATION_PARSING:vectime:parsetime", bb-aa, cc-bb)
         #sys.stdout.flush()
         return result
+        except Exception as e:
+            #print("eeeeeeeeeeeeeeeeeeeeeeee", e)
+            raise udpexceptions.UDParseConlluError(str(e))
 
     def api_config(self):
         # sent configuration data
@@ -721,6 +745,8 @@ class UDParse:
         conda_prefix = os.getenv("CONDA_PREFIX")
         if conda_prefix:
             dico["conda_prefix"] = conda_prefix
+        if self.fullforms:
+            dico["correct_languages"] = list(self.fullforms.lgs.keys())
         return json.dumps(dico)
 
 
@@ -761,7 +787,7 @@ class UDParse:
         # load only here to respect CUDA_VISIBLE_DEVICE
         import UDParse.ud_parser_tf2 as ud_parser
 
-        ud_parser.predict(args)
+        ud_parser.mainpredict(args)
         self.evaluate(args, evalfile)
 
         # plot evolution of dev-results
@@ -787,7 +813,9 @@ class UDParse:
                     file=ofp,
                 )
 
-        # TODO if more than one test file concatenate
+        evalo = io.StringIO()
+
+        # TODO test if more than one test file concatenate
         infile = "%s/test_in.conllu" % self.data["out"]
         ofp = open(infile, "w")
         for testfile in args.predict_input:
@@ -797,10 +825,11 @@ class UDParse:
             ifp.close()
         ofp.close()
 
-        evalo = io.StringIO()
+
         metrics = ud_eval.evaluate(
             ud_eval.load_conllu(open(infile), {}), ud_eval.load_conllu(open(args.predict_output), {}), ofp=evalo,  # open(args.predict_input)),
         )
+
 
         show(ofp=evalo)
 

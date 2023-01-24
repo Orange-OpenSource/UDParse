@@ -22,7 +22,7 @@ conda create -n udparse python=3.8
 conda activate udparse
 conda install cudatoolkit==11.3.1
 conda install cudnn==8.2.1
-pip --no-cache-dir install tensorflow-gpu==2.5.0rc1
+pip --no-cache-dir install tensorflow-gpu==2.5.0
 pip --no-cache-dir install tensorflow_addons==0.13.0
 pip --no-cache-dir install transformers==4.6.1
 pip --no-cache-dir install sentencepiece==0.1.95
@@ -222,4 +222,40 @@ print(r.text)
 
 use `http://localhost:8844/api/v1/doc`
 
+## Use programmatically (in python)
 
+load a parser instance
+
+```python
+import UDParse.UDParse
+
+udp = UDParse.UDParse(lg=None,
+	              action=UDParse.Action.SERVER,
+                      yml=<model-directory>,
+                      gpu=0,
+                      forcegpu=True,
+                      usepytorch=True,
+                      forceoutdir=False)
+while not udp.submitresult.done():
+     print("Still loading model ...", model, file=sys.stderr)
+     time.sleep(2)
+```
+
+use it
+
+```
+output = udp.api_process(in_text="my input sentence", is_text=True)
+output = udp.api_process(in_text=<string with tokenised sentence in CoNLL-U format>, is_text=False)
+```
+
+## Use it as an external dependency library
+
+For the CPU version
+```bash
+pip install . --find-links=https://download.pytorch.org/whl/torch_stable.html
+```
+
+For the GPU version
+```bash
+pip install .[gpu] --find-links=https://download.pytorch.org/whl/cu113/torch_stable.html
+```

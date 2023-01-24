@@ -560,7 +560,7 @@ class Network:
                 # alldeltas = []
                 for i in range(len(sentence_lens)):
                     padded_heads = np.pad(
-                        prior_heads[i][: sentence_lens[i], : sentence_lens[i] + 1].astype(np.float), ((1, 0), (0, 0)), mode="constant"
+                        prior_heads[i][: sentence_lens[i], : sentence_lens[i] + 1].astype(np.double), ((1, 0), (0, 0)), mode="constant"
                     )
                     # print("=====================================", padded_heads, sep="\n")
                     padded_heads[:, 0] = np.nan
@@ -635,6 +635,7 @@ class Network:
                 if args.parse:
                     overrides[dataset.HEAD] = heads[i]
                     overrides[dataset.DEPREL] = deprels[i]
+                # add a new conllu token (the entire sentence)
                 dataset.write_sentence(conllu, sentences, overrides)  # , allweights[i], alldeltas[i], svg)
                 sentences += 1
 
@@ -695,6 +696,7 @@ def train(args):
         os.mkdir(args.logdir)
 
     # Postprocess args
+    if isinstance(args.tags, str):
     args.tags = args.tags.split(",")
     args.epochs = [(int(epochs), float(lr)) for epochs, lr in (epochs_lr.split(":") for epochs_lr in args.epochs.split(","))]
 
@@ -764,7 +766,7 @@ def train(args):
                 root_factors,
                 train=train,
                 shuffle_batches=False,
-                embeddings_data=re.sub("(?=,|$)", "-test%s.npz" % args.emb_suffix, args.embeddings_data) if args.embeddings_data else None,
+                embeddings_data=re.sub("(?=,|$)", "-test%s.npz" % args.emb_suffix, args.embeddings_data) if args.embeddings_data else None
             )
     else:
         test = None
@@ -832,7 +834,7 @@ def train(args):
 
     progclient = None
     if args.progressServer != None:
-        progclient = UDParse.progClient.PS_Client("UdpipeFuture", args.progressServer)
+        progclient = UDParse.progClient.PS_Client("UDParse", args.progressServer)
         plist = []
         for metric in Network.METRICS:
             if metric not in ["qqMLAS", "BLEX"]:
@@ -850,6 +852,8 @@ def train(args):
         )
         progclient.setlimits("epoch", 0, 60)
         progclient.setlimits("LAS", 0, 100, inverse=True)
+        progclient.setlimits("Lemmas", 0, 100, inverse=True)
+        progclient.setlimits("UPOS", 0, 100, inverse=True)
 
     all_epochs = args.epochs[0][0] + args.epochs[1][0]
     ctepoch = -1
@@ -938,7 +942,7 @@ def train(args):
         network.saver_inference.save(network.session, "{}/checkpoint-inference-last".format(args.logdir), write_meta_graph=False)
 
 
-def predict(args):
+def mainpredict(args):
     command_line = " ".join(sys.argv)
 
     # Fix random seed
@@ -948,6 +952,7 @@ def predict(args):
         args.exp = "{}-{}".format(os.path.basename(__file__), datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"))
 
     # Postprocess args
+    if isinstance(args.tags, str):
     args.tags = args.tags.split(",")
     #args.epochs = [(int(epochs), float(lr)) for epochs, lr in (epochs_lr.split(":") for epochs_lr in args.epochs.split(","))]
 
@@ -995,7 +1000,7 @@ def predict(args):
             shuffle_batches=False,
             embeddings_data=re.sub("(?=,|$)", "-test%s.npz" % args.emb_suffix, args.embeddings_data) if args.embeddings_data else None,
             progserver=args.progressServer,
-            emb_calculator=calc,
+            emb_calculator=calc
         )
         #bb = time.time()
         #print("END vec", bb)
@@ -1021,7 +1026,17 @@ def predict(args):
         #cc = time.time()
         #print("START predict", cc)
         conllu = network.predict(test, False, args, train)
-        print(conllu, end="", file=open(args.predict_output, "w", encoding="utf-8") if args.predict_output else sys.stdout)
+
+        ### TODO: add postcorrection 
+        
+        ofp = sys.stdout
+        if isinstance(args.predict_output, io.StringIO):
+            ofp = args.predict_output
+        elif args.predict_output != None:
+            ofp = open(args.predict_output, "w", encoding="utf-8")
+            
+        #print(conllu, end="", file=open(args.predict_output, "w", encoding="utf-8") if args.predict_output else sys.stdout)
+        print(conllu, end="", file=ofp)
         #dd = time.time()
         #print("END predict", dd)
 

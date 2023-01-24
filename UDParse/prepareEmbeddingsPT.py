@@ -31,6 +31,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 import numpy as np
 import torch
 
+import UDParse.progClient as progClient
 
 # from transformers import XLMModel, XLMTokenizer
 from transformers import GPT2Model, GPT2Tokenizer
@@ -113,8 +114,23 @@ class Embeddings:
             self.model = BertModel.from_pretrained("bert-base-multilingual-uncased")
             if self.cuda_available:
                 self.model = self.model.cuda()
+            self.getVectors = self.getVectorsBert
 
+        elif lg == "electra":
+            from transformers import ElectraModel, ElectraTokenizer
+            self.tokenizer = ElectraTokenizer.from_pretrained("google/electra-base-discriminator")
+            self.model = ElectraModel.from_pretrained("google/electra-base-discriminator")
+            if self.cuda_available:
+                self.model = self.model.cuda()
+            self.getVectors = self.getVectorsBert
 
+        elif lg == "electra_fr":
+            from transformers import AutoModel, AutoTokenizer
+
+            self.tokenizer = AutoTokenizer.from_pretrained("dbmdz/electra-base-french-europeana-cased-discriminator")
+            self.model = AutoModel.from_pretrained("dbmdz/electra-base-french-europeana-cased-discriminator")
+            if self.cuda_available:
+                self.model = self.model.cuda()
             self.getVectors = self.getVectorsBert
 
         elif lg == "distilbert":
@@ -490,7 +506,7 @@ class Embeddings:
         for fn in fns:
             progclient = None
             if self.progressServer:
-                progclient = progClient.PS_Client("Contextual Embeddings", self.progressServer)
+                progclient = progClient.PS_Client("UDParse Embeddings", self.progressServer)
             logging.info("reading from %s" % fn)
             cc = UDParse.conllustats.CountConllu(fn)
             logging.info("  %d sentences, %d words" % (cc.sct, cc.wct))
