@@ -1,5 +1,5 @@
 numpy==1.24.1
-tensorflow-gpu==2.10.0
+tensorflow-gpu==2.12.0
 tensorflow_addons==0.13.0
 transformers==4.18.0
 sentencepiece==0.1.96
