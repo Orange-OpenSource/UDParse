@@ -56,8 +56,10 @@ pip3 install torch==1.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch
 In order to be able to process raw text, you need to install a [UDPipe 1.2 clone](https://github.com/ioan2/udpipe) tokenizer from
 our fork of UDpipe at https://github.com/ioan2/udpipe
 
+(replace 3.12 with 3.10 on Ubuntu 22.04)
+
 ```
-sudo apt install libpython3.8-dev
+sudo apt install libpython3.12-dev
 git clone https://github.com/ioan2/udpipe
 
 pushd udpipe/src
@@ -65,11 +67,12 @@ make
 popd
 
 pushd bindings/python
-make PYTHON_INCLUDE=/usr/include/python3.8
+make PYTHON_INCLUDE=/usr/include/python3.12
 popd
 ```
+* in `udpipe/bindings/python/ufal/udpipe.py` replace `from .ufal_udpipe import *` by `from ufal_udpipe import *`
+* copy UDpipe's `bindings/python/ufal/*` and `bindings/python/ufal_udpipe.so` to to UDParse's `UDParse` or use `PYTHONPATH=...` to specify the location of the UDPipe-bindings in order python can find it
 
-copy UDpipe's `bindings/python/ufal/*` and `bindings/python/ufal_udpipe.so` to to UDParse's `UDParse` or use `PYTHONPATH=...` to specify the location of the UDPipe-bindings in order python can find it
 
 # Train a model (on [Universal Dependencies](https://universaldependencies.org) data)
 
